@@ -11,8 +11,7 @@ clean_path = os.path.join("..", "data", "processed")
 # ---------- 1) FORECASTING ----------
 
 def forecast_ticker(ticker, n_steps):
-    path = os.path.join("..", "data", "processed") 
-    file_path = os.path.join(path, f"{ticker}.csv")
+    file_path = os.path.join(clean_path, f"{ticker}")
     df = pd.read_csv(file_path, parse_dates=["Date"], index_col="Date", low_memory=False).asfreq("B").ffill()
 
     price_col = "Adj Close"
@@ -20,32 +19,35 @@ def forecast_ticker(ticker, n_steps):
     returns = df["Return"].dropna()
     last_price = float(df[price_col].iloc[-1])
 
-    model = pm.auto_arima(returns, start_p=0, start_q=0, max_p=3, max_q=3, d=None, seasonal=False, stepwise=True, suppress_warnings=True, n_jobs=1)
+    model = pm.auto_arima(returns, start_p = 0, start_q = 0, max_p = 3, max_q = 3, seasonal = False, stepwise = True, suppress_warnings = True, n_jobs = 1)
 
-    vals, confi = model.predict(n_periods=int(n_steps), return_conf_int=True, alpha=0.05)
-    idx = pd.bdate_range(start=returns.index[-1] + pd.offsets.BDay(1), periods=int(n_steps), freq="B")
+    vals, confi = model.predict(n_periods = int(n_steps), return_conf_int = True, alpha = 0.05)
+    index = pd.bdate_range(start = returns.index[-1] + pd.offsets.BDay(1), periods = int(n_steps), freq = "B")
 
-    fc_returns = pd.DataFrame({"ret_hat": vals, "ret_lower": confi[:,0], "ret_upper": confi[:,1]}, index=idx)
-    fc_returns.index.name = "Date"
+    fc_returns = pd.DataFrame({"meanreturn": vals, "ret_lower": confi[:,0], "ret_upper": confi[:,1]}, index=index)
+    # fc_returns.index.name = "Date"
 
-    cumu = (1.0 + pd.Series(fc_returns["ret_hat"].values, index=idx)).cumprod()
-    fc_price = pd.DataFrame({"yhat": last_price * cumu}, index=idx)
-    fc_price.index.name = "Date"
+    cumu = (1.0 + pd.Series(fc_returns["meanreturn"].values, index=index)).cumprod()
+    fc_price = pd.DataFrame({"yhat": last_price * cumu}, index=index)
+    # fc_price.index.name = "Date"
     return fc_returns, fc_price
 
 # ---------- 2) HISTORICAL RETURNS MATRIX (for Riskfolio) ----------
 
 def get_cov_matrix(tickers, lookback_days=None):
-    rets = []
+    returns = []
     for ticker in tickers:
-        df = pd.read_csv(clean_path, f"{ticker}.csv", parse_dates=["Date"]).dropna(subset=["Return"])
-        df = df.set_index("Date").asfreq("B").ffill()
+        df = pd.read_csv(os.path.join(clean_path, f"{ticker}"))
         if lookback_days is not None:
             df = df.iloc[-lookback_days:]
-        rets.append(df["Return"].rename(ticker))
-    MATRIX = pd.concat(rets, axis=1).dropna()
-    return MATRIX
+        returns.append(df["Return"].rename(ticker))
+    matrix = pd.concat(returns, axis=1).dropna()
+    return matrix
+
+print(get_cov_matrix(["AAPL.csv", "MSFT.csv"]))
+
 # ---------- 3) PORTFOLIO OPTIMISATION ----------
+
 def optimise_portfolio(mu, Sigma, long_only=True):
     # Riskfolio expects returns matrix, but for custom mean/cov, use Portfolio object directly
     port = rf.Portfolio()
