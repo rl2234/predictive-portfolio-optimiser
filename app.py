@@ -6,13 +6,14 @@ import numpy as np
 import pmdarima as pm
 import os
 
-PROCESSED_DIR = Path("..") / "data" / "processed"
+clean_path = os.path.join("..", "data", "processed") 
 
 # ---------- 1) FORECASTING ----------
 
 def forecast_ticker(ticker, n_steps):
-    path = PROCESSED_DIR / f"{ticker}.csv"
-    df = pd.read_csv(path, parse_dates=["Date"], index_col="Date", low_memory=False).asfreq("B").ffill()
+    path = os.path.join("..", "data", "processed") 
+    file_path = os.path.join(path, f"{ticker}.csv")
+    df = pd.read_csv(file_path, parse_dates=["Date"], index_col="Date", low_memory=False).asfreq("B").ffill()
 
     price_col = "Adj Close"
 
@@ -36,14 +37,15 @@ def forecast_ticker(ticker, n_steps):
 
 def get_cov_matrix(tickers, lookback_days=None):
     rets = []
-    for t in tickers:
-        df = pd.read_csv(PROCESSED_DIR / f"{t}.csv", parse_dates=["Date"]).dropna(subset=["Return"])
+    for ticker in tickers:
+        df = pd.read_csv(clean_path, f"{ticker}.csv", parse_dates=["Date"]).dropna(subset=["Return"])
         df = df.set_index("Date").asfreq("B").ffill()
         if lookback_days is not None:
             df = df.iloc[-lookback_days:]
-        rets.append(df["Return"].rename(t))
+        rets.append(df["Return"].rename(ticker))
     MATRIX = pd.concat(rets, axis=1).dropna()
     return MATRIX
+# ---------- 3) PORTFOLIO OPTIMISATION ----------
 def optimise_portfolio(mu, Sigma, long_only=True):
     # Riskfolio expects returns matrix, but for custom mean/cov, use Portfolio object directly
     port = rf.Portfolio()
@@ -53,8 +55,6 @@ def optimise_portfolio(mu, Sigma, long_only=True):
     else:
         port.bounds = (-1, 1)
     weights = port.optimisation(model="Classic", rm="MV", obj="Sharpe", rf=0, l=0)
-    return weights
-    weights = port.optimisation(model="Classic", rm="MV", obj="Sharpe", rf= 0, l=0)
     return weights
 
 # ---------- 4) MONTE CARLO SIMULATION ----------
@@ -122,7 +122,7 @@ def backtest(tickers):
 st.title("Predictive Portfolio Optimiser")
 
 # choose tickers (multi), horizon, sims
-all_files = sorted([ticker for ticker in os.listdir(PROCESSED_DIR) if ticker.endswith('.csv')])
+all_files = sorted([ticker for ticker in os.listdir(clean_path) if ticker.endswith('.csv')])
 default = ["AAPL"] if "AAPL" in all_files else all_files[:1]
 tickers = st.multiselect("Tickers", options = all_files)
 n = st.number_input("Days to forecast", min_value=1, max_value=60, value=10, step=1)
