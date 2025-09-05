@@ -174,7 +174,7 @@ col_left, col_right = st.columns([1, 2], gap="large")
 with col_left:
     st.subheader("Controls")
     tickers = st.multiselect("1) Select 1 or more tickers from the S&P 100 list", options=available)
-    n_steps = st.number_input("2) Select an amount of days to forecast", min_value=1, max_value=60, value=10, step=1)
+    n_steps = st.number_input("2) Select an amount of days to forecast", min_value=1, max_value=20, value=10, step=1)
     st.caption("Tip: Think about how long you want to hold a single portfolio for!")
     lookback = st.number_input("Select a covariance lookback (number of days)", min_value=60, max_value=252*5, value=252, step=14)
     st.caption("Tip: Think about how much historical data we should use to judge how risky these tickers are together...")
